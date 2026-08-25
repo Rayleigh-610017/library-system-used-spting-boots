@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ログイン / サインイン</title>
+    <style>
+        .box {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-bottom: 20px;
+            width: 320px;
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/header :: header}"></div>
+
+    <h2>図書管理システム - 認証</h2>
+
+    <!-- エラーメッセージ表示 -->
+    <p th:if="${error}" th:text="${error}" style="color: red; font-weight: bold;"></p>
+    
+    <!-- 成功メッセージ表示（登録完了時など） -->
+    <p th:if="${message}" th:text="${message}" style="color: green; font-weight: bold;"></p>
+
+    <!-- ★ログインフォーム -->
+    <div class="box">
+        <h3>ログイン</h3>
+        <form th:action="@{/auth}" method="post">
+            <input type="hidden" name="action" value="login">
+            <div style="margin-bottom: 8px;">
+                <label for="userId">User ID:</label><br>
+                <input type="text" id="userId" name="userId" required placeholder="半角数字">
+            </div>
+            <div style="margin-bottom: 8px;">
+                <label for="password">Password:</label><br>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">ログイン</button>
+        </form>
+    </div>
+
+    <!-- ★新規ユーザー登録（サインイン）フォーム -->
+    <div class="box">
+        <h3>新規アカウント作成</h3>
+        <form th:action="@{/auth}" method="post">
+            <input type="hidden" name="action" value="signin">
+            <div style="margin-bottom: 8px;">
+                <label for="regPassword">Password (英数字10文字以内):</label><br>
+                <input type="password" id="regPassword" name="password" maxlength="10" required>
+            </div>
+            <button type="submit">新規登録する</button>
+        </form>
+    </div>
+
+    <p><a th:href="@{/books}">← 本一覧に戻る</a></p>
+</body>
+</html>

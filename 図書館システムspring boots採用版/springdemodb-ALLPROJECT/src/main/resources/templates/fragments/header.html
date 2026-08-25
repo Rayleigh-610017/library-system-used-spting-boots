@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Header Fragment</title>
+</head>
+<body>
+    <div th:fragment="header" style="background-color: #f4f4f4; padding: 10px; margin-bottom: 20px; border-bottom: 1px solid #ccc;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 style="margin: 0; font-size: 1.5em;">📚 図書管理システム</h1>
+            
+            <div>
+                <a th:href="@{/books}" style="margin-right: 15px;">書籍一覧</a>
+                
+                <!-- ★ 管理者(Admin)の場合のみ「書籍管理(追加/更新/削除)」のリンクを表示 -->
+                <a th:if="${session.loginUser != null and session.loginUser.role == 'Admin'}" 
+                   th:href="@{/books(view='admin')}" 
+                   style="margin-right: 15px; font-weight: bold; color: #d9534f;">
+                    ⚙️ 書籍管理
+                </a>
+
+                <a th:href="@{/rent}" style="margin-right: 15px;">貸出ログ</a>
+
+                <!-- ログイン済みの表示 -->
+                <span th:if="${session.loginUser != null}">
+                    ユーザーID: <strong th:text="${session.loginUser.userId}"></strong>
+                    <span th:if="${session.loginUser.role == 'Admin'}" style="color: red; font-weight: bold;">(管理者)</span>
+                    <a th:href="@{/auth?action=logout}" style="margin-left: 10px;">ログアウト</a>
+                </span>
+
+                <!-- 未ログインの表示 -->
+                <span th:if="${session.loginUser == null}">
+                    <a th:href="@{/login}">ログイン / 新規登録</a>
+                </span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

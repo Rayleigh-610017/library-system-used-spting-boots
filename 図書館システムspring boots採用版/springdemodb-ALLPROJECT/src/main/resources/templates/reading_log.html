@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>貸出ログ一覧</title>
+</head>
+<body>
+    <!-- ヘッダー読み込み -->
+    <div th:replace="~{fragments/header :: header}"></div>
+
+    <h2>📜 貸出履歴・ログ</h2>
+
+    <!-- 権限による表示切り替えメッセージ -->
+    <p th:if="${isAdminView}" style="color: blue; font-weight: bold;">【管理者モード】全ユーザーの貸出履歴を表示しています。</p>
+    <p th:unless="${isAdminView}">【個人モード】あなたの貸出履歴を表示しています。</p>
+
+    <!-- 貸出ログ表示テーブル -->
+    <table border="1" cellpadding="8" style="border-collapse: collapse; width: 100%; margin-top: 10px;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th>ログID</th>
+                <th>ユーザーID</th>
+                <th>ISBN</th>
+                <th>書籍タイトル</th>
+                <th>貸出日時</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="log : ${logs}">
+                <td th:text="${log.logId}">1</td>
+                <td th:text="${log.userId}">1001</td>
+                <td th:text="${log.isbn}">978-4-00-000000-0</td>
+                <!-- ReadingLog から Book リレーション経由で title を表示 -->
+                <td th:text="${log.book != null ? log.book.title : '（タイトル不明）'}">Java入門</td>
+                <!-- 貸出日時の整形表示 -->
+                <td th:text="${#temporals.format(log.rentDate, 'yyyy-MM-dd HH:mm:ss')}">2026-08-05 12:00:00</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(logs)}">
+                <td colspan="5" style="text-align: center; color: #666;">貸出履歴が存在しません。</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="margin-top: 20px;">
+        <a th:href="@{/books}">← 書籍一覧へ戻る</a>
+    </div>
+</body>
+</html>

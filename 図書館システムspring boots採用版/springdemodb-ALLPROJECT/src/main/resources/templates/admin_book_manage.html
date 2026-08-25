@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>【管理者】書籍データ管理</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .form-section { background: #f9f9f9; padding: 15px; border: 1px solid #ddd; margin-bottom: 20px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label.title-label { display: inline-block; width: 120px; font-weight: bold; vertical-align: top; }
+        .btn-add { background-color: #4CAF50; color: white; border: none; padding: 8px 16px; cursor: pointer; font-weight: bold; }
+        .btn-update { background-color: #2196F3; color: white; border: none; padding: 4px 8px; cursor: pointer; }
+        .btn-delete { background-color: #f44336; color: white; border: none; padding: 4px 8px; cursor: pointer; }
+        .btn-search { background-color: #555555; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+        
+        .category-options { display: inline-block; max-width: 600px; }
+        .category-item { display: inline-block; margin-right: 12px; margin-bottom: 6px; cursor: pointer; }
+        .category-item input { margin-right: 4px; cursor: pointer; }
+        .new-category-input { margin-top: 6px; margin-left: 124px; }
+
+        /* ★ ページネーション用スタイル */
+        .pagination { display: flex; justify-content: center; align-items: center; margin-top: 20px; gap: 8px; }
+        .pagination a, .pagination span { padding: 6px 12px; text-decoration: none; border: 1px solid #ccc; color: #333; border-radius: 4px; }
+        .pagination a:hover { background-color: #e9e9e9; }
+        .pagination .active { background-color: #2196F3; color: white; border-color: #2196F3; font-weight: bold; }
+        .pagination .disabled { color: #aaa; border-color: #eee; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <!-- 共通ヘッダー -->
+    <div th:replace="~{fragments/header :: header}"></div>
+
+    <h2>【管理者用】書籍の新規登録・変更・削除</h2>
+    <p><a th:href="@{/books}">← 一覧画面（一般用）に戻る</a></p>
+
+    <!-- 1. 新規書籍登録フォーム -->
+    <div class="form-section">
+        <h3>1. 新しい書籍の登録</h3>
+        <form th:action="@{/books}" method="post" id="addBookForm">
+            <input type="hidden" name="action" value="add">
+            <input type="hidden" name="view" value="admin">
+
+            <div class="form-group">
+                <label class="title-label">ISBN:</label>
+                <input type="text" name="isbn" required placeholder="例: 978-4000000001">
+            </div>
+            
+            <div class="form-group">
+                <label class="title-label">タイトル:</label>
+                <input type="text" name="title" required style="width: 300px;">
+            </div>
+
+            <!-- カテゴリー選択・新規入力欄 -->
+            <div class="form-group">
+                <label class="title-label">カテゴリ:</label>
+                <div class="category-options">
+                    <th:block th:each="cat, iterStat : ${categories}">
+                        <label class="category-item">
+                            <input type="radio" name="categorySelect" th:value="${cat}" 
+                                   th:checked="${iterStat.index == 0}" onchange="toggleCategoryInput()">
+                            <span th:text="${cat}">カテゴリ名</span>
+                        </label>
+                    </th:block>
+
+                    <label class="category-item" style="font-weight: bold; color: #0056b3;">
+                        <input type="radio" name="categorySelect" value="__NEW__" 
+                               th:checked="${#lists.isEmpty(categories)}" id="radioNewCategory" onchange="toggleCategoryInput()">
+                        ＋ 新規追加
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group new-category-input" id="newCategoryArea">
+                <input type="text" id="newCategoryText" placeholder="新しいカテゴリ名を入力" style="width: 250px;">
+            </div>
+
+            <input type="hidden" name="category" id="finalCategory">
+
+            <div class="form-group">
+                <label class="title-label">著者:</label>
+                <input type="text" name="writer" required style="width: 250px;">
+            </div>
+            
+            <div class="form-group">
+                <label class="title-label">出版社:</label>
+                <input type="text" name="publisher" required style="width: 250px;">
+            </div>
+            
+            <div class="form-group">
+                <label class="title-label">URL/画像:</label>
+                <input type="text" name="url" style="width: 350px;">
+            </div>
+
+            <div style="margin-left: 124px; margin-top: 15px;">
+                <button type="submit" class="btn-add">書籍を登録する</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 2. 管理書籍の検索・絞り込み -->
+    <div class="form-section">
+        <h3>2. 管理書籍の検索・絞り込み</h3>
+        <form th:action="@{/books}" method="get">
+            <input type="hidden" name="view" value="admin">
+            <div class="form-group">
+                <label class="title-label">検索ワード:</label>
+                <input type="text" name="keyword" th:value="${param.keyword}" placeholder="ISBN、タイトル、著者など" style="width: 250px;">
+                <button type="submit" class="btn-search">検索</button>
+                <a th:if="${param.keyword != null and !#strings.isEmpty(param.keyword)}" th:href="@{/books(view='admin')}" style="margin-left: 10px; font-size: 0.9em;">検索解除</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- 3. 既存書籍の一覧・更新・削除フォーム -->
+    <h3>3. 登録済み書籍一覧（変更・削除処理）</h3>
+
+    <!-- 件数表示 -->
+    <p th:if="${bookPage != null and bookPage.totalElements > 0}">
+        全 <strong th:text="${bookPage.totalElements}">0</strong> 件中 
+        <span th:text="${bookPage.number * bookPage.size + 1}">1</span> 〜 
+        <span th:text="${bookPage.last ? bookPage.totalElements : (bookPage.number + 1) * bookPage.size}">30</span> 件目を表示
+    </p>
+
+    <p th:if="${bookPage == null or bookPage.isEmpty()}">該当する書籍はありません。</p>
+
+    <!-- 書籍テーブル -->
+    <table th:if="${bookPage != null and not bookPage.isEmpty()}">
+        <thead>
+            <tr>
+                <th>ISBN</th>
+                <th>タイトル</th>
+                <th>カテゴリ</th>
+                <th>著者</th>
+                <th>出版社</th>
+                <th>画像URL</th>
+                <th>ステータス</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="book : ${bookPage.content}">
+                <form th:action="@{/books}" method="post">
+                    <input type="hidden" name="view" value="admin">
+                    <input type="hidden" name="isbn" th:value="${book.isbn}">
+
+                    <td th:text="${book.isbn}">ISBN</td>
+                    <td><input type="text" name="title" th:value="${book.title}" required style="width: 90%;"></td>
+                    <td><input type="text" name="category" th:value="${book.category}" required style="width: 90%;"></td>
+                    <td><input type="text" name="writer" th:value="${book.writer}" required style="width: 90%;"></td>
+                    <td><input type="text" name="publisher" th:value="${book.publisher}" required style="width: 90%;"></td>
+                    <td><input type="text" name="url" th:value="${book.url}" style="width: 90%;"></td>
+                    <td th:text="${book.rentStatus}">ステータス</td>
+                    <td style="white-space: nowrap;">
+                        <button type="submit" name="action" value="update" class="btn-update">更新</button>
+                        <button type="submit" name="action" value="delete" class="btn-delete" onclick="return confirm('本当に削除しますか？');">削除</button>
+                    </td>
+                </form>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- ★ ページネーションコントロール -->
+    <div class="pagination" th:if="${bookPage != null and bookPage.totalPages > 1}">
+        <!-- 前へボタン -->
+        <a th:if="${!bookPage.first}" 
+           th:href="@{/books(view='admin', page=${bookPage.number - 1}, keyword=${param.keyword})}">« 前へ</a>
+        <span th:if="${bookPage.first}" class="disabled">« 前へ</span>
+
+        <!-- ページ番号リンク -->
+        <th:block th:each="i : ${#numbers.sequence(0, bookPage.totalPages - 1)}">
+            <span th:if="${i == bookPage.number}" class="active" th:text="${i + 1}">1</span>
+            <a th:if="${i != bookPage.number}" 
+               th:href="@{/books(view='admin', page=${i}, keyword=${param.keyword})}" 
+               th:text="${i + 1}">2</a>
+        </th:block>
+
+        <!-- 次へボタン -->
+        <a th:if="${!bookPage.last}" 
+           th:href="@{/books(view='admin', page=${bookPage.number + 1}, keyword=${param.keyword})}">次へ »</a>
+        <span th:if="${bookPage.last}" class="disabled">次へ »</span>
+    </div>
+
+    <script>
+        function toggleCategoryInput() {
+            const selectedRadio = document.querySelector('input[name="categorySelect"]:checked');
+            const newCategoryText = document.getElementById('newCategoryText');
+            const newCategoryArea = document.getElementById('newCategoryArea');
+
+            if (selectedRadio && selectedRadio.value === '__NEW__') {
+                newCategoryArea.style.display = 'block';
+                newCategoryText.required = true;
+                newCategoryText.focus();
+            } else {
+                newCategoryArea.style.display = 'none';
+                newCategoryText.required = false;
+                newCategoryText.value = '';
+            }
+        }
+
+        document.getElementById('addBookForm').addEventListener('submit', function(e) {
+            const selectedRadio = document.querySelector('input[name="categorySelect"]:checked');
+            const finalCategoryInput = document.getElementById('finalCategory');
+
+            if (!selectedRadio) {
+                alert('カテゴリーを選択してください。');
+                e.preventDefault();
+                return;
+            }
+
+            if (selectedRadio.value === '__NEW__') {
+                const newCatVal = document.getElementById('newCategoryText').value.trim();
+                if (!newCatVal) {
+                    alert('新しいカテゴリー名を入力してください。');
+                    e.preventDefault();
+                    return;
+                }
+                finalCategoryInput.value = newCatVal;
+            } else {
+                finalCategoryInput.value = selectedRadio.value;
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleCategoryInput();
+        });
+    </script>
+</body>
+</html>

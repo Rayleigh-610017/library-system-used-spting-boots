@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>書籍一覧</title>
+    <style>
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+        }
+        .pagination a, .pagination span, .pagination strong {
+            padding: 6px 12px;
+            text-decoration: none;
+            border: 1px solid #ddd;
+            color: #333;
+            border-radius: 4px;
+        }
+        .pagination a:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/header :: header}"></div>
+
+    <h2>書籍検索・一覧</h2>
+
+    <!-- エラーメッセージ -->
+    <p th:if="${session.rentError}" th:text="${session.rentError}" style="color: red; font-weight: bold;"></p>
+
+    <!-- 検索フォーム & 簡単検索エリア -->
+    <div style="margin-bottom: 15px;">
+        <form th:action="@{/books}" method="get" style="margin-bottom: 8px;">
+            <input type="hidden" name="category" th:if="${param.category}" th:value="${param.category}" />
+            <input type="text" name="keyword" th:value="${param.keyword}" placeholder="タイトル・著者・カテゴリ・ISBN">
+            <button type="submit">検索</button>
+
+            <a th:if="${param.keyword != null or param.category != null}" th:href="@{/books}" style="margin-left: 10px; font-size: 0.9em;">検索を解除</a>
+        </form>
+
+        <div style="margin-top: 10px;">
+            【簡単検索】
+            <a th:href="@{/books}" th:style="${param.category == null or #strings.isEmpty(param.category)} ? 'font-weight:bold; margin-right: 8px;' : 'margin-right: 8px;'">すべて</a>
+
+            <th:block th:each="cat : ${categories}">
+                <a th:href="@{/books(category=${cat}, keyword=${param.keyword})}"
+                   th:text="${cat}"
+                   th:style="${#strings.equals(param.category, cat)} ? 'font-weight:bold; margin-right: 8px;' : 'margin-right: 8px;'">
+                   カテゴリ名
+                </a>
+            </th:block>
+        </div>
+    </div>
+
+    <!-- 件数表示（追加） -->
+    <p th:if="${bookPage != null and bookPage.totalElements > 0}" style="margin-top: 15px; font-size: 0.9em;">
+        全 <strong th:text="${bookPage.totalElements}">0</strong> 件中 
+        <span th:text="${bookPage.number * bookPage.size + 1}">1</span> 〜 
+        <span th:text="${bookPage.last ? bookPage.totalElements : (bookPage.number + 1) * bookPage.size}">30</span> 件目を表示
+    </p>
+
+    <!-- 書籍一覧テーブル -->
+    <table border="1" cellpadding="8" style="margin-top: 10px; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th>画像</th>
+                <th>ISBN</th>
+                <th>タイトル</th>
+                <th>ジャンル</th>
+                <th>著者</th>
+                <th>出版元</th>
+                <th>状態</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="book : ${books}">
+                <td><img th:src="${book.url}" width="50" alt="img"></td>
+                <td th:text="${book.isbn}">ISBN</td>
+                <td th:text="${book.title}">タイトル</td>
+                <td th:text="${book.category}">ジャンル</td>
+                <td th:text="${book.writer}">著者</td>
+                <td th:text="${book.publisher}">出版元</td>
+                <td>
+                    <span th:if="${book.rentStatus == 'Rent'}" style="color: red; font-weight: bold;">Rent (貸出不可)</span>
+                    <span th:unless="${book.rentStatus == 'Rent'}" style="color: green;">貸出可能</span>
+                </td>
+                <td>
+                    <!-- ログインしている場合 -->
+                    <th:block th:if="${session.loginUser != null}">
+                        
+                        <!-- ① 誰も借りていない（貸出可能）場合：【貸出】ボタン -->
+                        <form th:if="${book.rentStatus != 'Rent'}" th:action="@{/rent}" method="post" style="display: inline;">
+                            <input type="hidden" name="isbn" th:value="${book.isbn}">
+                            <input type="hidden" name="action" value="rent">
+                            <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 4px 8px; cursor: pointer;">貸出</button>
+                        </form>
+
+                        <!-- ② 自分が借りている場合：【返却】ボタン -->
+                        <form th:if="${book.rentStatus == 'Rent' and book.borrowerUserId == session.loginUser.userId}" th:action="@{/rent}" method="post" style="display: inline;">
+                            <input type="hidden" name="isbn" th:value="${book.isbn}">
+                            <input type="hidden" name="action" value="return">
+                            <button type="submit" style="background-color: #f44336; color: white; border: none; padding: 4px 8px; cursor: pointer;">返却</button>
+                        </form>
+
+                        <!-- ③ 他人が借りていて、管理者(Admin)の場合：【強制返却】ボタン -->
+                        <form th:if="${book.rentStatus == 'Rent' and book.borrowerUserId != session.loginUser.userId and session.loginUser.role == 'Admin'}" th:action="@{/rent}" method="post" style="display: inline;">
+                            <input type="hidden" name="isbn" th:value="${book.isbn}">
+                            <input type="hidden" name="action" value="return">
+                            <button type="submit" style="background-color: #ff9800; color: white; border: none; padding: 4px 8px; cursor: pointer;" onclick="return confirm('管理権限で強制返却しますか？');">強制返却</button>
+                        </form>
+
+                        <!-- ④ 他人が借りていて、一般ユーザーの場合：テキスト「貸出中」を表示 -->
+                        <span th:if="${book.rentStatus == 'Rent' and book.borrowerUserId != session.loginUser.userId and session.loginUser.role != 'Admin'}" style="color: #888; font-weight: bold;">
+                            貸出中
+                        </span>
+
+                    </th:block>
+
+                    <!-- 未ログインの場合 -->
+                    <small th:if="${session.loginUser == null}">ログイン後操作可能</small>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- ページネーションコントロール（テーブルの外下に配置） -->
+    <div class="pagination" th:if="${bookPage != null and bookPage.totalPages > 1}" style="margin-top: 20px; text-align: center;">
+        
+        <!-- 前へボタン -->
+        <a th:if="${!bookPage.first}" 
+           th:href="@{/books(page=${bookPage.number - 1}, keyword=${param.keyword}, category=${param.category})}">« 前へ</a>
+        <span th:if="${bookPage.first}" class="disabled" style="color: #ccc;">« 前へ</span>
+
+        <!-- ページ番号リンク (例: 1 2 3 ...) -->
+        <th:block th:each="i : ${#numbers.sequence(0, bookPage.totalPages - 1)}">
+            <!-- 現在のページ（クリック不可・ハイライト表示） -->
+            <strong th:if="${i == bookPage.number}" 
+                    th:text="${i + 1}" 
+                    style="padding: 5px 10px; background-color: #007bff; color: white; border-radius: 3px;">1</strong>
+            
+            <!-- その他のページリンク -->
+            <a th:if="${i != bookPage.number}" 
+               th:href="@{/books(page=${i}, keyword=${param.keyword}, category=${param.category})}" 
+               th:text="${i + 1}" 
+               style="padding: 5px 10px; border: 1px solid #ccc; text-decoration: none; border-radius: 3px;">2</a>
+        </th:block>
+
+        <!-- 次へボタン -->
+        <a th:if="${!bookPage.last}" 
+           th:href="@{/books(page=${bookPage.number + 1}, keyword=${param.keyword}, category=${param.category})}">次へ »</a>
+        <span th:if="${bookPage.last}" class="disabled" style="color: #ccc;">次へ »</span>
+
+    </div>
+
+</body>
+</html>
